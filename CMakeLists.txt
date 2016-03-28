@@ -17,15 +17,33 @@ if(NOT EXISTS ${CMAKE_BINARY_DIR}/boost)
   execute_process(
     COMMAND "${GIT_EXECUTABLE}" clone https://github.com/boostorg/boost.git "${CMAKE_BINARY_DIR}/boost"
     )
+
+  execute_process(
+    COMMAND "${GIT_EXECUTABLE}" -C "${CMAKE_BINARY_DIR}/boost" checkout refs/tags/boost-${BOOST_VERSION}
+    )
+
   execute_process(
     COMMAND "${GIT_EXECUTABLE}" -C "${CMAKE_BINARY_DIR}/boost" submodule update --init
     )
-  execute_process(
-    COMMAND "${GIT_EXECUTABLE}" -C "${CMAKE_BINARY_DIR}/boost" submodule foreach '"${GIT_EXECUTABLE}" checkout refs/tags/boost-${BOOST_VERSION} || :' 
-    )
+
+  if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+    # On Windows, git submodule foreach does not recognize OR(||) syntax.
+    execute_process(
+      COMMAND "${CMAKE_COMMAND}" -E echo "\"${GIT_EXECUTABLE}\" checkout refs/tags/boost-${BOOST_VERSION} || echo \"checkout failed\""
+      OUTPUT_FILE ${CMAKE_BINARY_DIR}/checkout.bat
+      )
+
+    execute_process(
+      COMMAND "${GIT_EXECUTABLE}" -C "${CMAKE_BINARY_DIR}/boost" submodule foreach ${CMAKE_BINARY_DIR}/checkout.bat
+      )
+  elseif(${CMAKE_SYSTEM_NAME} MATCHES "((Linux)|(Darwin))")
+    execute_process(
+      COMMAND "${GIT_EXECUTABLE}" -C "${CMAKE_BINARY_DIR}/boost" submodule foreach '"${GIT_EXECUTABLE}" checkout refs/tags/boost-${BOOST_VERSION} || :'
+      )
+  endif()
 endif()
 
-if(NOT EXISTS ${CMAKE_BINARY_DIR}/boost/b2)
+if(NOT EXISTS ${CMAKE_BINARY_DIR}/boost/b2 AND NOT EXISTS ${CMAKE_BINARY_DIR}/boost/b2.exe)
   if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
     set(BOOST_BOOTSTRAP_COMMAND bootstrap.bat)
   elseif(${CMAKE_SYSTEM_NAME} MATCHES "((Linux)|(Darwin))")
@@ -70,18 +88,20 @@ if(NOT EXISTS ${BOOST_ROOT})
 
   if(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     set(B2Args
-      "\
-b2.exe --prefix=${BOOST_ROOT} --build-dir=${CMAKE_BINARY_DIR}/boost/Build \
---with-atomic --with-chrono --with-date_time \
---with-filesystem --with-log --with-program_options \
---with-regex --with-system --with-thread \
-toolset=msvc variant=release link=static \
-threading=multi runtime-link=static address-model=64 \
-install"
+      b2.exe
+      --prefix=${BOOST_ROOT}
+      --build-dir=${CMAKE_BINARY_DIR}/boost/Build
+      --with-atomic --with-chrono --with-date_time
+      --with-filesystem --with-log --with-program_options
+      --with-regex --with-system --with-thread
+      toolset=msvc variant=debug,release link=static
+      threading=multi runtime-link=static address-model=64
+      install
       )
+
   elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     set(B2Args
-      ./b2 
+      ./b2
       --prefix=${BOOST_ROOT}
       --build-dir=${CMAKE_BINARY_DIR}/boost/Build
       --with-atomic --with-chrono --with-date_time
@@ -107,10 +127,30 @@ endif()
 
 add_library(boost_cmake INTERFACE)
 
+find_file(BOOST_INCLUDEDIR
+  boost
+  PATHS ${BOOST_ROOT}/include
+  PATH_SUFFIXES
+  boost-1_60 # On Windows, b2.exe install header files in {prefix}/include/boost_{version}
+  )
+
+if(NOT EXISTS ${BOOST_INCLUDEDIR})
+  message(SEND_ERROR "version.hpp could not found in the BOOST_ROOT, ${BOOST_ROOT}")
+endif()
+
+get_filename_component(
+  BOOST_INCLUDEDIR
+  ${BOOST_INCLUDEDIR}
+  DIRECTORY
+  )
+
+message(STATUS "BOOST_INCLUDEDIR =" "${BOOST_INCLUDEDIR}")
+
 set(Boost_USE_STATIC_LIBS ON)
 set(Boost_USE_STATIC_RUNTIME ON)
 set(Boost_USE_DEBUG_RUNTIME ON)
-set(BOOST_NO_SYSTEM_PATHS ON)
+set(Boost_NO_SYSTEM_PATHS ON)
+set(BOOST_LIBRARYDIR "${BOOST_ROOT}/lib")
 
 find_host_package(
   Boost
