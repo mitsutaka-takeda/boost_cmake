@@ -7,8 +7,29 @@ if(NOT COMMAND find_host_package)
   endmacro()
 endif()
 
+# macro to find file on the host OS
+macro( find_host_file )
+ set( CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER )
+ set( CMAKE_FIND_ROOT_PATH_MODE_LIBRARY NEVER )
+ set( CMAKE_FIND_ROOT_PATH_MODE_INCLUDE NEVER )
+ if( CMAKE_HOST_WIN32 )
+  SET( WIN32 1 )
+  SET( UNIX )
+ elseif( CMAKE_HOST_APPLE )
+  SET( APPLE 1 )
+  SET( UNIX )
+ endif()
+ find_file( ${ARGN} )
+ SET( WIN32 )
+ SET( APPLE )
+ SET( UNIX 1 )
+ set( CMAKE_FIND_ROOT_PATH_MODE_PROGRAM ONLY )
+ set( CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY )
+ set( CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY )
+endmacro()
+
 # Tag
-find_package(Git REQUIRED)
+find_host_package(Git REQUIRED)
 
 set(BOOST_VERSION 1.60.0)
 set(BOOST_ROOT "${CMAKE_BINARY_DIR}/boost_${BOOST_VERSION}")
@@ -46,18 +67,21 @@ endif()
 if(NOT EXISTS ${CMAKE_BINARY_DIR}/boost/b2 AND NOT EXISTS ${CMAKE_BINARY_DIR}/boost/b2.exe)
   if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
     set(BOOST_BOOTSTRAP_COMMAND bootstrap.bat)
-  elseif(${CMAKE_SYSTEM_NAME} MATCHES "((Linux)|(Darwin))")
+  elseif(${CMAKE_SYSTEM_NAME} MATCHES "((Linux)|(Darwin)|(Android))")
     set(BOOST_BOOTSTRAP_COMMAND ./bootstrap.sh)
   else()
-    message(SEND_ERROR "Unsupported system: CMAKE_SYSTEM_NAME should be ${CMAKE_SYSTEM_NAME}")
+    message(SEND_ERROR "Unsupported CMAKE_SYSTEM_NAME : ${CMAKE_SYSTEM_NAME}")
   endif()
   execute_process(
     COMMAND ${BOOST_BOOTSTRAP_COMMAND}
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/boost/"
     )
 
-  if(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-    message(STATUS "CMAKE_CXX_COMPILER_ID =" "${CMAKE_CXX_COMPILER_ID}")
+  if(ANDROID)
+    set(BOOST_COMPILER_RULE
+      "using gcc : arm : arm-linux-androideabi-g++ ;"
+      )
+  elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     set(BOOST_COMPILER_RULE
       "using msvc ;"
       )
@@ -69,11 +93,11 @@ if(NOT EXISTS ${CMAKE_BINARY_DIR}/boost/b2 AND NOT EXISTS ${CMAKE_BINARY_DIR}/bo
     message(SEND_ERROR "Unsupported compiler: CMAKE_CXX_COMPILER_ID should be ${CMAKE_CXX_COMPILER_ID}")
   endif()
 
-  # configure_file(
-  #   "${CMAKE_CURRENT_SOURCE_DIR}/project-config.jam.in"
-  #   "${CMAKE_BINARY_DIR}/boost/project-config.jam"
-  #   @ONLY
-  #   )
+  configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/project-config.jam.in"
+    "${CMAKE_BINARY_DIR}/boost/project-config.jam"
+    @ONLY
+    )
 endif()
 
 if(NOT EXISTS ${BOOST_ROOT})
@@ -86,7 +110,24 @@ if(NOT EXISTS ${BOOST_ROOT})
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/boost/"
     )
 
-  if(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+  if(ANDROID)
+    set(B2Args
+      ./b2
+      --prefix=${BOOST_ROOT}
+      --build-dir=${CMAKE_BINARY_DIR}/boost/Build
+      --with-atomic --with-chrono --with-date_time
+      --with-filesystem --with-log --with-program_options
+      --with-regex --with-system --with-thread
+      toolset=gcc-arm variant=release link=static
+      threading=multi threadapi=pthread target-os=android
+      define=BOOST_MATH_DISABLE_FLOAT128
+      include=/home/mtakeda/etc/arm-linux-androideabi-4.9/include/c++/4.9
+      include=$ANDROID_NDK_ROOT/sources/cxx-stl/gnu-libstdc++/4.9/include
+      include=$ANDROID_NDK_ROOT/sources/cxx-stl/gnu-libstdc++/4.9/libs/armeabi/include
+      include=$ANDROID_NDK_ROOT/platforms/android-19/arch-arm/usr/include
+      install
+      )
+  elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     set(B2Args
       b2.exe
       --prefix=${BOOST_ROOT}
@@ -127,15 +168,16 @@ endif()
 
 add_library(boost_cmake INTERFACE)
 
-find_file(BOOST_INCLUDEDIR
+find_host_file(BOOST_INCLUDEDIR
   boost
   PATHS ${BOOST_ROOT}/include
   PATH_SUFFIXES
   boost-1_60 # On Windows, b2.exe install header files in {prefix}/include/boost_{version}
+  NO_DEFAULT_PATH
   )
 
 if(NOT EXISTS ${BOOST_INCLUDEDIR})
-  message(SEND_ERROR "version.hpp could not found in the BOOST_ROOT, ${BOOST_ROOT}")
+  message(SEND_ERROR "BOOST_INCLUDEDIR could not be found in the BOOST_ROOT, ${BOOST_ROOT}")
 endif()
 
 get_filename_component(
