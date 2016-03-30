@@ -67,6 +67,8 @@ endif()
 if(NOT EXISTS ${CMAKE_BINARY_DIR}/boost/b2 AND NOT EXISTS ${CMAKE_BINARY_DIR}/boost/b2.exe)
   if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
     set(BOOST_BOOTSTRAP_COMMAND bootstrap.bat)
+  elseif(IOS)
+    set(BOOST_BOOTSTRAP_COMMAND ./bootstrap.sh --with-toolset=clang)
   elseif(${CMAKE_SYSTEM_NAME} MATCHES "((Linux)|(Darwin)|(Android))")
     set(BOOST_BOOTSTRAP_COMMAND ./bootstrap.sh)
   else()
@@ -80,6 +82,10 @@ if(NOT EXISTS ${CMAKE_BINARY_DIR}/boost/b2 AND NOT EXISTS ${CMAKE_BINARY_DIR}/bo
   if(ANDROID)
     set(BOOST_COMPILER_RULE
       "using gcc : arm : arm-linux-androideabi-g++ ;"
+      )
+  elseif(IOS)
+    set(BOOST_COMPILER_RULE
+      " using clang ;"
       )
   elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     set(BOOST_COMPILER_RULE
@@ -143,6 +149,80 @@ if(NOT EXISTS ${BOOST_ROOT})
       threading=multi runtime-link=static address-model=64
       install
       )
+  elseif(IOS)
+    # For IOS we need to build for both arm and simulator(x86).
+    execute_process(
+      COMMAND ${CMAKE_COMMAND} -E echo "\
+#!/bin/sh
+./b2 --prefix=${BOOST_ROOT} --build-dir=${CMAKE_BINARY_DIR}/boost/Build \
+ --libdir=${BOOST_ROOT}/lib/iphone_arm \
+ --with-atomic --with-chrono --with-date_time \
+ --with-filesystem --with-log --with-program_options --with-regex --with-system --with-thread \
+ toolset=clang cflags=\"-arch armv7 -arch armv7s -arch arm64\" \
+ cxxflags=-std=c++11 cxxflags=-stdlib=libc++ cxxflags=-fvisibility=hidden cxxflags=-fvisibility-inlines-hidden \
+ linkflags=-stdlib=libc++ link=static architecture=arm target-os=iphone threading=multi define=_LITTLE_ENDIAN \
+ variant=release \
+ include=/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS7.1.sdk/usr/include \
+ install
+
+./b2 --prefix=${BOOST_ROOT} --build-dir=${CMAKE_BINARY_DIR}/boost/Build \
+ --libdir=${BOOST_ROOT}/lib/ios \
+ --with-atomic --with-chrono --with-date_time \
+ --with-filesystem --with-log --with-program_options --with-regex --with-system --with-thread \
+ toolset=clang cflags=\"-arch armv7 -arch armv7s -arch arm64\" \
+ cxxflags=-std=c++11 cxxflags=-stdlib=libc++ cxxflags=-fvisibility=hidden cxxflags=-fvisibility-inlines-hidden \
+ linkflags=-stdlib=libc++ link=static architecture=arm target-os=iphone threading=multi define=_LITTLE_ENDIAN \
+ variant=release \
+ include=/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS7.1.sdk/usr/include \
+ --clean
+
+./b2 \
+ --prefix=${BOOST_ROOT} \
+ --build-dir=${CMAKE_BINARY_DIR}/boost/Build \
+ --libdir=${BOOST_ROOT}/lib/iphone_sim \
+ --with-atomic --with-chrono --with-date_time \
+ --with-filesystem --with-log --with-program_options \
+ --with-regex --with-system --with-thread \
+ toolset=clang \
+ cflags=\"-arch i386 -arch x86_64\" \
+ cxxflags=-std=c++11 cxxflags=-stdlib=libc++ cxxflags=-fvisibility=hidden cxxflags=-fvisibility-inlines-hidden \
+ linkflags=-stdlib=libc++ link=static architecture=arm target-os=iphone threading=multi define=_LITTLE_ENDIAN \
+ variant=release \
+ include=/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneSimulator7.1.sdk/usr/include \
+ install
+
+./b2 \
+ --prefix=${BOOST_ROOT} \
+ --build-dir=${CMAKE_BINARY_DIR}/boost/Build \
+ --libdir=${BOOST_ROOT}/lib/iphone_sim \
+ --with-atomic --with-chrono --with-date_time \
+ --with-filesystem --with-log --with-program_options \
+ --with-regex --with-system --with-thread \
+ toolset=clang \
+ cflags=\"-arch i386 -arch x86_64\" \
+ cxxflags=-std=c++11 cxxflags=-stdlib=libc++ cxxflags=-fvisibility=hidden cxxflags=-fvisibility-inlines-hidden \
+ linkflags=-stdlib=libc++ link=static architecture=arm target-os=iphone threading=multi define=_LITTLE_ENDIAN \
+ variant=release \
+ include=/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneSimulator7.1.sdk/usr/include \
+ --clean
+
+for li in `find ${BOOST_ROOT}/lib/iphone_arm -name \"*.a\"`; do
+FILENAME=$(basename $li \"${BOOST_ROOT}/lib/iphone_arm\")
+lipo -create \"${BOOST_ROOT}/lib/iphone_arm/$FILENAME\" \"${BOOST_ROOT}/lib/iphone_sim/$FILENAME\" -output \"${BOOST_ROOT}/lib/$FILENAME\"
+done
+
+rm -rf ${BOOST_ROOT}/lib/iphone_arm
+rm -rf ${BOOST_ROOT}/lib/iphone_sim \
+"
+OUTPUT_FILE build_boost.sh
+)
+
+    execute_process(
+      COMMAND chmod 744 build_boost.sh
+      )
+    set(B2Args
+      ${CMAKE_BINARY_DIR}/build_boost.sh
+      )
   elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(B2Args
       ./b2
@@ -174,7 +254,6 @@ if(NOT EXISTS ${BOOST_ROOT})
     message(SEND_ERROR "Unsupported compiler: CMAKE_CXX_COMPILER_ID should be ${CMAKE_CXX_COMPILER_ID}")
   endif()
 
-  # separate_arguments(B2Args)
   message(STATUS "B2Args =" "${B2Args}")
   execute_process(
     COMMAND ${B2Args}
