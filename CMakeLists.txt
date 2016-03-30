@@ -85,6 +85,10 @@ if(NOT EXISTS ${CMAKE_BINARY_DIR}/boost/b2 AND NOT EXISTS ${CMAKE_BINARY_DIR}/bo
     set(BOOST_COMPILER_RULE
       "using msvc ;"
       )
+  elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set(BOOST_COMPILER_RULE
+      "using clang : 3.7 : : clang ;"
+      )
   elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     set(BOOST_COMPILER_RULE
       "using gcc : 4.9.3 : : <archiver>/usr/bin/gcc-ar <ranlib>/usr/bin/gcc-ranlib ;"
@@ -139,7 +143,19 @@ if(NOT EXISTS ${BOOST_ROOT})
       threading=multi runtime-link=static address-model=64
       install
       )
-
+  elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set(B2Args
+      ./b2
+      --prefix=${BOOST_ROOT}
+      --build-dir=${CMAKE_BINARY_DIR}/boost/Build
+      --with-atomic --with-chrono --with-date_time
+      --with-filesystem --with-log --with-program_options
+      --with-regex --with-system --with-thread
+      toolset=clang-3.7 variant=release link=static
+      threading=multi runtime-link=static address-model=64
+      cxxflags=-std=c++14 cxxflags=-fPIC cxxflags=-stdlib=libstdc++
+      install
+      )
   elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     set(B2Args
       ./b2
