@@ -67,9 +67,9 @@ endif()
 if(NOT EXISTS ${CMAKE_BINARY_DIR}/boost/b2 AND NOT EXISTS ${CMAKE_BINARY_DIR}/boost/b2.exe)
   if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
     set(BOOST_BOOTSTRAP_COMMAND bootstrap.bat)
-  elseif(IOS)
+  elseif(IOS OR (${CMAKE_SYSTEM_NAME} MATCHES "Darwin"))
     set(BOOST_BOOTSTRAP_COMMAND ./bootstrap.sh --with-toolset=clang)
-  elseif(${CMAKE_SYSTEM_NAME} MATCHES "((Linux)|(Darwin)|(Android))")
+  elseif(${CMAKE_SYSTEM_NAME} MATCHES "((Linux)|(Android))")
     set(BOOST_BOOTSTRAP_COMMAND ./bootstrap.sh)
   else()
     message(SEND_ERROR "Unsupported CMAKE_SYSTEM_NAME : ${CMAKE_SYSTEM_NAME}")
@@ -83,7 +83,7 @@ if(NOT EXISTS ${CMAKE_BINARY_DIR}/boost/b2 AND NOT EXISTS ${CMAKE_BINARY_DIR}/bo
     set(BOOST_COMPILER_RULE
       "using gcc : arm : arm-linux-androideabi-g++ ;"
       )
-  elseif(IOS)
+  elseif(IOS OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang"))
     set(BOOST_COMPILER_RULE
       " using clang ;"
       )
@@ -100,7 +100,7 @@ if(NOT EXISTS ${CMAKE_BINARY_DIR}/boost/b2 AND NOT EXISTS ${CMAKE_BINARY_DIR}/bo
       "using gcc : 4.9.3 : : <archiver>/usr/bin/gcc-ar <ranlib>/usr/bin/gcc-ranlib ;"
       )
   else()
-    message(SEND_ERROR "Unsupported compiler: CMAKE_CXX_COMPILER_ID should be ${CMAKE_CXX_COMPILER_ID}")
+    message(SEND_ERROR "Unsupported compiler CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
   endif()
 
   configure_file(
@@ -223,6 +223,21 @@ OUTPUT_FILE build_boost.sh
     set(B2Args
       ${CMAKE_BINARY_DIR}/build_boost.sh
       )
+  elseif(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+    set(B2Args
+      ./b2
+      --prefix=${BOOST_ROOT}
+      --build-dir=${CMAKE_BINARY_DIR}/boost/Build
+      --with-atomic --with-chrono --with-date_time
+      --with-filesystem --with-log --with-program_options
+      --with-regex --with-system --with-thread
+      toolset=clang
+      cflags=-arch\ i386\ -arch\ x86_64
+      cxxflags=-fvisibility=hidden cxxflags=-fvisibility-inlines-hidden
+      cxxflags=-std=c++11 cxxflags=-stdlib=libc++ cxxflags=-ftemplate-depth=512
+      linkflags="-stdlib=libc++" link=static
+      install
+      )
   elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(B2Args
       ./b2
@@ -321,6 +336,5 @@ target_link_libraries(
   ${Boost_REGEX_LIBRARY}
   ${Boost_DATE_TIME_LIBRARY}
   ${Boost_SYSTEM_LIBRARY}
-  ${Boost_FILESYSTEM_LIBRARY}
   ${Boost_THREAD_LIBRARY}
   )
