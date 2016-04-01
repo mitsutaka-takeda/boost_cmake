@@ -253,6 +253,15 @@ OUTPUT_FILE build_boost.sh
       install
       )
   elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+    if(ENABLE_LTO)
+      set(LTO_RELATED_FLAGS
+        cxxflags=-flto 
+        cxxflags=-fuse-linker-plugin
+        linkflags=-flto
+        linkflags=-fuse-linker-plugin
+        )
+    endif()
+
     set(B2Args
       ./b2
       --prefix=${BOOST_ROOT}
@@ -262,8 +271,8 @@ OUTPUT_FILE build_boost.sh
       --with-regex --with-system --with-thread
       toolset=gcc variant=release link=static
       threading=multi runtime-link=static address-model=64
-      cxxflags=-std=c++14 cxxflags=-flto cxxflags=-fPIC cxxflags=-fuse-linker-plugin
-      linkflags=-flto linkflags=-fuse-linker-plugin
+      cxxflags=-std=c++14  cxxflags=-fPIC
+      ${LTO_RELATED_FLAGS}
       install
       )
   else()
