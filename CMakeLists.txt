@@ -72,7 +72,7 @@ endif()
 
 if(NOT EXISTS ${CMAKE_BINARY_DIR}/boost/b2 AND NOT EXISTS ${CMAKE_BINARY_DIR}/boost/b2.exe)
   if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
-    set(BOOST_BOOTSTRAP_COMMAND bootstrap.bat)
+    set(BOOST_BOOTSTRAP_COMMAND bootstrap.bat --with-toolset=msvc)
   elseif(IOS OR (${CMAKE_SYSTEM_NAME} MATCHES "Darwin"))
     set(BOOST_BOOTSTRAP_COMMAND ./bootstrap.sh --with-toolset=clang)
   elseif(${CMAKE_SYSTEM_NAME} MATCHES "((Linux)|(Android))")
@@ -86,25 +86,20 @@ if(NOT EXISTS ${CMAKE_BINARY_DIR}/boost/b2 AND NOT EXISTS ${CMAKE_BINARY_DIR}/bo
     )
 
   if(ANDROID)
-    set(BOOST_COMPILER_RULE
-      "using gcc : arm : arm-linux-androideabi-g++ ;"
-      )
+    set(TOOLSET "gcc")
+    set(BOOST_COMPILER_RULE "using gcc : arm : arm-linux-androideabi-g++ ;")
   elseif(IOS OR (CMAKE_CXX_COMPILER_ID MATCHES "Clang"))
-    set(BOOST_COMPILER_RULE
-      " using clang ;"
-      )
+    set(TOOLSET "clang")
+    set(BOOST_COMPILER_RULE "using clang ;")
   elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-    set(BOOST_COMPILER_RULE
-      "using msvc ;"
-      )
+    set(TOOLSET "msvc")
+    set(BOOST_COMPILER_RULE "using msvc ;")
   elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    set(BOOST_COMPILER_RULE
-      "using clang : 3.7 : : clang ;"
-      )
+    set(TOOLSET "clang")
+    set(BOOST_COMPILER_RULE "using clang : 3.7 : : clang ;")
   elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-    set(BOOST_COMPILER_RULE
-      "using gcc : : : <archiver>/usr/bin/gcc-ar <ranlib>/usr/bin/gcc-ranlib ;"
-      )
+    set(TOOLSET "gcc")
+    set(BOOST_COMPILER_RULE "using gcc : : : <archiver>/usr/bin/gcc-ar <ranlib>/usr/bin/gcc-ranlib ;")
   else()
     message(SEND_ERROR "Unsupported compiler CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
   endif()
