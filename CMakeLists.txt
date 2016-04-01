@@ -103,7 +103,7 @@ if(NOT EXISTS ${CMAKE_BINARY_DIR}/boost/b2 AND NOT EXISTS ${CMAKE_BINARY_DIR}/bo
       )
   elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     set(BOOST_COMPILER_RULE
-      "using gcc : 4.9.3 : : <archiver>/usr/bin/gcc-ar <ranlib>/usr/bin/gcc-ranlib ;"
+      "using gcc : : : <archiver>/usr/bin/gcc-ar <ranlib>/usr/bin/gcc-ranlib ;"
       )
   else()
     message(SEND_ERROR "Unsupported compiler CMAKE_CXX_COMPILER_ID: ${CMAKE_CXX_COMPILER_ID}")
@@ -265,7 +265,7 @@ OUTPUT_FILE build_boost.sh
       --with-atomic --with-chrono --with-date_time
       --with-filesystem --with-log --with-program_options
       --with-regex --with-system --with-thread
-      toolset=gcc-4.9.3 variant=release link=static
+      toolset=gcc variant=release link=static
       threading=multi runtime-link=static address-model=64
       cxxflags=-std=c++14 cxxflags=-flto cxxflags=-fPIC cxxflags=-fuse-linker-plugin
       linkflags=-flto linkflags=-fuse-linker-plugin
