@@ -339,6 +339,7 @@ target_include_directories(
 target_link_libraries(
   boost_cmake
   INTERFACE
+  ${Boost_ATOMIC_LIBRARY}
   ${Boost_CHRONO_LIBRARY}
   ${Boost_FILESYSTEM_LIBRARY}
   ${Boost_LOG_LIBRARY}
